@@ -1,0 +1,9 @@
+[package]
+name = "rust-dns-udp-query"
+version = "0.1.0"
+authors = ["mgr_inz_rafal <rchabowski@gmail.com>"] 
+edition = "2018"
+
+[dependencies]
+rand = "*"
+bytes = "*"
