@@ -1,9 +1,49 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use std::fmt;
 use std::net::UdpSocket;
 
 #[derive(Default)]
-struct DNSPacket<'a> {
+struct DNSResponse {
+    id: u16,
+    qr: bool,
+    opcode: u8,
+    aa: bool,
+    tc: bool,
+    rd: bool,
+    ra: bool,
+    z: u8,
+    rcode: u8,
+    ancount: u16,
+    nscount: u16,
+    arcount: u16,
+}
+
+impl<'a> DNSResponse {
+    fn new() -> DNSResponse {
+        DNSResponse {
+            id: rand::random::<u16>(),
+            qr: false,
+            opcode: 0,
+            aa: false,
+            tc: false,
+            rd: true,
+            ra: false,
+            z: 0,
+            rcode: 0,
+            ancount: 0,
+            nscount: 0,
+            arcount: 0,
+            ..Default::default()
+        }
+    }
+
+    fn from_buffer(&mut self, buf: &mut Buf) {
+        self.id = buf.get_u16_le();
+    }
+}
+
+#[derive(Default)]
+struct DNSRequest<'a> {
     id: u16,
     qr: bool,
     opcode: u8,
@@ -19,9 +59,9 @@ struct DNSPacket<'a> {
     names: Vec<Vec<&'a str>>,
 }
 
-impl<'a> DNSPacket<'a> {
-    fn new() -> DNSPacket<'a> {
-        DNSPacket {
+impl<'a> DNSRequest<'a> {
+    fn new() -> DNSRequest<'a> {
+        DNSRequest {
             id: rand::random::<u16>(),
             qr: false,
             opcode: 0,
@@ -154,8 +194,41 @@ fn get_bits(num: u16, count: usize) -> String {
     binary_string.chars().skip(16 - count).collect()
 }
 
-impl<'a> fmt::Debug for DNSPacket<'a> {
+impl fmt::Debug for DNSResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "--- Begin of packet ---");
+        writeln!(f, "id:\t{}", self.id);
+        writeln!(f, "qr:\t{}", self.qr);
+        writeln!(f, "opcode:\t{}", get_bits(self.opcode as u16, 4));
+        writeln!(f, "aa:\t{}", self.aa);
+        writeln!(f, "tc:\t{}", self.tc);
+        writeln!(f, "rd:\t{}", self.rd);
+        writeln!(f, "ra:\t{}", self.ra);
+        writeln!(f, "z:\t{}", get_bits(self.z as u16, 3));
+        writeln!(f, "rcode:\t{}", get_bits(self.rcode as u16, 4));
+        writeln!(f, "--");
+        //writeln!(f, "qdcount:\t{}", get_bits(self.qdcount(), 16));
+        writeln!(f, "ancount:\t{}", get_bits(self.ancount, 16));
+        writeln!(f, "nscount:\t{}", get_bits(self.nscount, 16));
+        writeln!(f, "arcount:\t{}", get_bits(self.arcount, 16));
+        writeln!(f, "--");
+        let mut name_count = 1;
+        /*
+        for n in &self.names {
+            writeln!(f, "name #{}:", name_count);
+            name_count += 1;
+            for part in n {
+                writeln!(f, "(len: {})\t{}", part.len(), part);
+            }
+        }
+        */
+        writeln!(f, "--- End of packet ---")
+    }
+}
+
+impl<'a> fmt::Debug for DNSRequest<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "--- Begin of packet ---");
         writeln!(f, "id:\t{}", self.id);
         writeln!(f, "qr:\t{}", self.qr);
         writeln!(f, "opcode:\t{}", get_bits(self.opcode as u16, 4));
@@ -203,15 +276,15 @@ fn dump_buffer(buf: &bytes::BytesMut) {
 }
 
 fn main() {
-    let mut x = DNSPacket::new();
+    let mut req = DNSRequest::new();
 
     let name01 = String::from("www.wp.pl");
     let name02 = String::from("www.vatican.va");
-    x.add_question(&name01);
-    x.add_question(&name02);
-    println!("{:?}", x);
+    req.add_question(&name01);
+    req.add_question(&name02);
+    println!("{:?}", req);
 
-    let binary_representation = x.to_buffer();
+    let binary_representation = req.to_buffer();
     dump_buffer(&binary_representation);
 
     let socket = UdpSocket::bind("0.0.0.0:0").expect("Couldn't bind to address");
@@ -232,4 +305,11 @@ fn main() {
         bb.put_u8(buf[x]);
     }
     dump_buffer(&bb);
+
+    let mut xxx = buf.into_buf();
+    let mut resp = DNSResponse::new();
+    resp.from_buffer(&mut xxx);
+
+    println!();
+    println!("{:?}", resp);
 }
