@@ -39,6 +39,18 @@ impl<'a> DNSResponse {
 
     fn from_buffer(&mut self, buf: &mut Buf) {
         self.id = buf.get_u16_le();
+
+        let mut byte = buf.get_u8();
+        self.qr = if byte & 0b10000000 > 0 { true } else { false };
+        self.opcode = byte & 0b01111000;
+        self.aa = if byte & 0b00000100 > 0 { true } else { false };
+        self.tc = if byte & 0b00000010 > 0 { true } else { false };
+        self.rd = if byte & 0b00000001 > 0 { true } else { false };
+
+        byte = buf.get_u8();
+        self.ra = if byte & 0b10000000 > 0 { true } else { false };
+        self.z = byte & 0b01110000;
+        self.rcode = byte & 0b00001111;
     }
 }
 
